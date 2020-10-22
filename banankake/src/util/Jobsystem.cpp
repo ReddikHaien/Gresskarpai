@@ -14,6 +14,7 @@
 #include <algorithm>
 
 #include "Buffers.h"
+#include "Logging.h"
 #include "Jobsystem.h"
 
 
@@ -34,12 +35,11 @@ namespace JobSystem{
 		auto numCores = std::thread::hardware_concurrency();
 		numThreads = std::max(1u,numCores);
 		for (uint32_t id = 0; id < numThreads; ++id){
-			std::thread worker([]{
+			std::thread worker([id]{
 					std::function<void()> job;
 
 					while(true){
-						if (!pool.empty()){
-							job = pool.pop();
+						if (pool.pop(job)){
 							job();
 							finishedLabel.fetch_add(1);
 						}
@@ -47,6 +47,9 @@ namespace JobSystem{
 							std::unique_lock<std::mutex> lock(wakeMutex);
 							wakeCondition.wait(lock);
 						}
+
+						//Logger::print(std::to_string(id));
+
 					}
 			});
 
@@ -65,6 +68,35 @@ namespace JobSystem{
 			poll();
 		}
 		wakeCondition.notify_one();
+	}
+
+	void dipatch(uint32_t jobCount, uint32_t groupSize, std::function<void(Dispatch)> job){
+		if (jobCount == 0 || groupSize == 0) return;
+
+		const uint32_t groupCount = (jobCount + groupSize - 1) / groupSize;
+
+		currentLabel+=groupCount;
+
+		for (uint32_t groupIndex = 0; groupIndex < groupCount; ++groupIndex){
+			auto group = [jobCount,groupSize,job,groupIndex](){
+				const uint32_t offset = groupIndex*groupSize;
+				const uint32_t end = std::min(offset+groupSize,jobCount);
+
+				Dispatch args;
+				args.groupID = groupIndex;
+
+				for (uint32_t jobIndex = offset; jobIndex < end; ++jobIndex){
+					args.jobID = jobIndex;
+					job(args);
+				}
+			};
+
+			while(!pool.push(group)){
+				poll();
+			}
+
+			wakeCondition.notify_one();
+		}
 	}
 
 	bool isBusy(){

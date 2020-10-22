@@ -30,30 +30,38 @@ namespace Buffers{
 
 
 		bool push(T value){
-			std::lock_guard<std::mutex> guard(lock);
 
-			if ((end+1)%size == start){
-				//vi har fylt opp hele bufferen
-				return false;
-			}
-			else{
-				end = (end+1)%size;
+			bool result = false;
+			lock.lock();
+
+			if ((end+1)%size != start){
+
 				elements[end] = value;
-				return true;
+				end = (end+1)%size;
+				result = true;
 			}
-
+			lock.unlock();
+			return result;
 		}
 
-		T pop(){
-			std::lock_guard<std::mutex> guard(lock);
-			T v = elements[start];
-			start = (start + 1)%size;
-			return v;
+		bool pop(std::function<void()>& out){
+			bool result = false;
+			lock.lock();
+			if (start != end){
+				out = elements[start];
+				start = (start + 1)%size;
+				result = true;
+			}
+			lock.unlock();
+			return result;
 		}
 
 		bool empty(){
-			std::lock_guard<std::mutex> guard(lock);
-			return start == end;
+			bool result = false;
+			lock.lock();
+			result = start == empty;
+			lock.unlock();
+			return result;
 		}
 
 		~CirkularBuffer(){
