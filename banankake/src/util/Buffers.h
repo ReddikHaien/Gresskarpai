@@ -8,6 +8,8 @@
 #ifndef UTIL_BUFFERS_H_
 #define UTIL_BUFFERS_H_
 
+
+#include "Logging.h"
 #include <mutex>
 #include <array>
 namespace Buffers{
@@ -30,10 +32,9 @@ namespace Buffers{
 
 
 		bool push(T value){
-
 			bool result = false;
 			lock.lock();
-
+			//Logger::print(std::string("skubb[ start: ") + std::to_string(start) + " slutt " + std::to_string(end) + " ]");
 			if ((end+1)%size != start){
 
 				elements[end] = value;
@@ -47,10 +48,14 @@ namespace Buffers{
 		bool pop(std::function<void()>& out){
 			bool result = false;
 			lock.lock();
+			//Logger::print(std::string("pop[ start: ") + std::to_string(start) + " slutt " + std::to_string(end) + " ]");
 			if (start != end){
 				out = elements[start];
 				start = (start + 1)%size;
 				result = true;
+			}
+
+			else{
 			}
 			lock.unlock();
 			return result;

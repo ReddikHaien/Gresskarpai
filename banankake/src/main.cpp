@@ -8,15 +8,21 @@
 #include <mutex>
 #include "util/Jobsystem.h"
 #include "util/Logging.h"
-#include "screen/Screen.h"
+#include "core/Physics.h"
 int main(){
 	JobSystem::init();
-	Screen::init();
+	JobSystem::execute([](){System::Physics::init();});
 
-	Screen::setChar(10, 10, '@', FG_RED, BG_BLACK);
+	JobSystem::wait();
 
-	Screen::update();
-
+	System::Physics::addNewBody(0,0,1);
+	System::Physics::addNewBody(2,0,1);
+	System::Physics::addNewBody(0,2,1);
+	System::Physics::addNewBody(2,2,1);
+	while(true){
+		System::Physics::run();
+		System::Physics::print();
+	}
 	return 0;
 }
 

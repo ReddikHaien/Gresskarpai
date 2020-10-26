@@ -32,15 +32,17 @@ namespace JobSystem{
 	}
 	void init(){
 		finishedLabel.store(0);
-		auto numCores = std::thread::hardware_concurrency();
+		auto numCores = std::thread::hardware_concurrency() - 1;
 		numThreads = std::max(1u,numCores);
 		for (uint32_t id = 0; id < numThreads; ++id){
-			std::thread worker([id]{
+			std::thread worker([]{
 					std::function<void()> job;
 
 					while(true){
 						if (pool.pop(job)){
-							job();
+							if (job){
+								job();
+							}
 							finishedLabel.fetch_add(1);
 						}
 						else{
@@ -58,7 +60,6 @@ namespace JobSystem{
 	}
 
 	static inline void poll(){
-		wakeCondition.notify_one();
 		std::this_thread::yield();
 	}
 
@@ -67,7 +68,9 @@ namespace JobSystem{
 		while(!pool.push(func)){
 			poll();
 		}
+;
 		wakeCondition.notify_one();
+
 	}
 
 	void dipatch(uint32_t jobCount, uint32_t groupSize, std::function<void(Dispatch)> job){
@@ -76,7 +79,6 @@ namespace JobSystem{
 		const uint32_t groupCount = (jobCount + groupSize - 1) / groupSize;
 
 		currentLabel+=groupCount;
-
 		for (uint32_t groupIndex = 0; groupIndex < groupCount; ++groupIndex){
 			auto group = [jobCount,groupSize,job,groupIndex](){
 				const uint32_t offset = groupIndex*groupSize;
@@ -96,6 +98,7 @@ namespace JobSystem{
 			}
 
 			wakeCondition.notify_one();
+
 		}
 	}
 
